@@ -8,6 +8,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import (  # noqa: E402
+    ImageStretchToSize,
     NODE_CLASS_MAPPINGS,
     NODE_DISPLAY_NAME_MAPPINGS,
     MaskImageComposite,
@@ -140,6 +141,82 @@ class MaskImageCompositeTests(unittest.TestCase):
         self.assertEqual(MaskImageComposite.CATEGORY, "image/composite")
         self.assertIs(NODE_CLASS_MAPPINGS["MaskImageComposite"], MaskImageComposite)
         self.assertEqual(NODE_DISPLAY_NAME_MAPPINGS["MaskImageComposite"], "遮罩叠加")
+
+
+class ImageStretchToSizeTests(unittest.TestCase):
+    def setUp(self):
+        self.node = ImageStretchToSize()
+
+    def test_comfyui_metadata_defaults_and_registration(self):
+        required = ImageStretchToSize.INPUT_TYPES()["required"]
+        self.assertEqual(required["image"], ("IMAGE",))
+        self.assertEqual(
+            required["target_width"],
+            ("INT", {"default": 2048, "min": 1, "max": 16384, "step": 1}),
+        )
+        self.assertEqual(
+            required["target_height"],
+            ("INT", {"default": 1024, "min": 1, "max": 16384, "step": 1}),
+        )
+        self.assertEqual(
+            required["interpolation"],
+            (["bicubic", "bilinear", "nearest", "area"], {"default": "bicubic"}),
+        )
+        self.assertEqual(ImageStretchToSize.RETURN_TYPES, ("IMAGE",))
+        self.assertEqual(ImageStretchToSize.RETURN_NAMES, ("image",))
+        self.assertEqual(ImageStretchToSize.FUNCTION, "stretch")
+        self.assertEqual(ImageStretchToSize.CATEGORY, "image/transform")
+        self.assertIs(NODE_CLASS_MAPPINGS["ImageStretchToSize"], ImageStretchToSize)
+        self.assertEqual(
+            NODE_DISPLAY_NAME_MAPPINGS["ImageStretchToSize"], "拉伸到目标尺寸"
+        )
+
+    def test_stretches_to_exact_requested_dimensions(self):
+        image = torch.arange(1 * 2 * 3 * 1, dtype=torch.float32).reshape(1, 2, 3, 1)
+
+        output, = self.node.stretch(image, 5, 4, "bicubic")
+
+        self.assertEqual(tuple(output.shape), (1, 4, 5, 1))
+
+    def test_supports_every_interpolation_mode(self):
+        image = torch.rand((1, 3, 5, 3), dtype=torch.float32)
+
+        for mode in ("bicubic", "bilinear", "nearest", "area"):
+            with self.subTest(mode=mode):
+                output, = self.node.stretch(image, 8, 6, mode)
+                self.assertEqual(tuple(output.shape), (1, 6, 8, 3))
+
+    def test_preserves_batch_channels_dtype_and_device(self):
+        image = torch.rand((2, 3, 4, 4), dtype=torch.float64)
+
+        output, = self.node.stretch(image, 7, 5, "bilinear")
+
+        self.assertEqual(tuple(output.shape), (2, 5, 7, 4))
+        self.assertEqual(output.dtype, image.dtype)
+        self.assertEqual(output.device, image.device)
+
+    def test_same_size_returns_original_tensor_object(self):
+        image = torch.rand((1, 3, 4, 3), dtype=torch.float32)
+
+        output, = self.node.stretch(image, 4, 3, "bicubic")
+
+        self.assertIs(output, image)
+
+    def test_rejects_invalid_target_dimensions(self):
+        image = torch.rand((1, 2, 2, 3), dtype=torch.float32)
+
+        with self.assertRaisesRegex(ValueError, "target_width"):
+            self.node.stretch(image, 0, 2, "bicubic")
+        with self.assertRaisesRegex(ValueError, "target_height"):
+            self.node.stretch(image, 2, 0, "bicubic")
+
+    def test_rejects_invalid_image_and_interpolation(self):
+        with self.assertRaisesRegex(ValueError, "BHWC"):
+            self.node.stretch(torch.zeros((2, 2, 3)), 4, 4, "bicubic")
+
+        image = torch.rand((1, 2, 2, 3), dtype=torch.float32)
+        with self.assertRaisesRegex(ValueError, "interpolation"):
+            self.node.stretch(image, 4, 4, "lanczos")
 
 
 if __name__ == "__main__":

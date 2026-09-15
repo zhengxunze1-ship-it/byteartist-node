@@ -77,6 +77,63 @@ def _resize_mask(mask, height, width):
     return resized.squeeze(1)
 
 
+class ImageStretchToSize:
+    """Force a ComfyUI image to an exact width and height."""
+
+    INTERPOLATION_MODES = ("bicubic", "bilinear", "nearest", "area")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "image": ("IMAGE",),
+                "target_width": (
+                    "INT",
+                    {"default": 2048, "min": 1, "max": 16384, "step": 1},
+                ),
+                "target_height": (
+                    "INT",
+                    {"default": 1024, "min": 1, "max": 16384, "step": 1},
+                ),
+                "interpolation": (
+                    list(cls.INTERPOLATION_MODES),
+                    {"default": "bicubic"},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+    RETURN_NAMES = ("image",)
+    FUNCTION = "stretch"
+    CATEGORY = "image/transform"
+
+    def stretch(self, image, target_width, target_height, interpolation):
+        _validate_image(image, "image")
+        if target_width < 1:
+            raise ValueError("target_width must be at least 1")
+        if target_height < 1:
+            raise ValueError("target_height must be at least 1")
+        if interpolation not in self.INTERPOLATION_MODES:
+            raise ValueError(
+                "interpolation must be one of: "
+                + ", ".join(self.INTERPOLATION_MODES)
+            )
+
+        if image.shape[1:3] == (target_height, target_width):
+            return (image,)
+
+        image_bchw = image.permute(0, 3, 1, 2)
+        resize_options = {
+            "size": (target_height, target_width),
+            "mode": interpolation,
+        }
+        if interpolation in ("bicubic", "bilinear"):
+            resize_options["align_corners"] = False
+
+        resized = F.interpolate(image_bchw, **resize_options)
+        return (resized.permute(0, 2, 3, 1),)
+
+
 class MaskImageComposite:
     """Blend two ComfyUI images using a mask, with image A as size reference."""
 
@@ -123,9 +180,11 @@ class MaskImageComposite:
 NODE_CLASS_MAPPINGS = {
     "PanoramaTileOffset": PanoramaTileOffset,
     "MaskImageComposite": MaskImageComposite,
+    "ImageStretchToSize": ImageStretchToSize,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "PanoramaTileOffset": "平铺偏移",
     "MaskImageComposite": "遮罩叠加",
+    "ImageStretchToSize": "拉伸到目标尺寸",
 }
