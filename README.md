@@ -20,7 +20,7 @@
 git clone https://github.com/zhengxunze1-ship-it/byteartist-node.git
 ```
 
-重启 ComfyUI，在节点搜索框输入 `平铺偏移` 或 `遮罩叠加`。
+重启 ComfyUI，在节点搜索框输入 `平铺偏移`、`遮罩叠加` 或 `拉伸到目标尺寸`。
 
 连接方式：
 
@@ -58,6 +58,24 @@ IMAGE → 平铺偏移 → IMAGE
 ```
 
 图片 A 与图片 B 需要具有相同的通道数。常规 ComfyUI RGB 图片可以直接连接。
+
+## 拉伸到目标尺寸
+
+`拉伸到目标尺寸` 会忽略原图宽高比，把图片强制拉伸到指定分辨率：
+
+- 输入：`image`
+- 目标宽度：`target_width`，默认 `2048`，范围 `1` 至 `16384`
+- 目标高度：`target_height`，默认 `1024`，范围 `1` 至 `16384`
+- 插值：`interpolation`，可选 `bicubic`（默认）、`bilinear`、`nearest`、`area`
+- 输出：批量数、通道数、数据类型和设备保持不变的 `IMAGE`
+
+连接方式：
+
+```text
+IMAGE → 拉伸到目标尺寸 → 2048 × 1024 IMAGE
+```
+
+这个节点不会裁剪或补边；当目标宽高比不同于原图时，画面会按要求产生拉伸变形。
 
 ## 测试
 
