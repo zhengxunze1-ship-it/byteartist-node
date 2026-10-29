@@ -82,3 +82,20 @@ IMAGE → 拉伸到目标尺寸 → 2048 × 1024 IMAGE
 ```bash
 python3 -m unittest discover -s tests -v
 ```
+
+
+## Terrain Tile Studio 地表贴图节点
+
+复现 Terrain Tile Studio 0.1.0、ComfyUI 复现说明 v1.0 的确定性部分。
+
+- **Terrain Prepare Seam**：按原尺寸做 50% X/Y 循环偏移；生成默认单侧 5% 十字遮罩与同像素纯红引导图。
+- **Terrain PBR From BaseColor**：按文档的 sRGB 线性化、Wrap Box Blur、Height、Sobel Normal、Roughness、Metallic、AO、ORM 公式生成七张贴图。支持 OpenGL / DirectX 法线。
+- **Terrain Tile Check**：输出 2×2 和 4×4 平铺预览。
+- **Terrain Export Bundle**：保存七张 PNG 和 parameters.json；每次运行创建新目录。
+
+将此目录放入 ComfyUI/custom_nodes 后重启，或在 ByteArtist 的 BA Manager 中通过 Git 链接 `https://github.com/zhengxunze1-ship-it/byteartist-node.git` 安装。依赖仅为 ComfyUI 已有的 NumPy、PyTorch 和 Pillow。
+
+图像生成和补缝使用 ByteArtist 已有模型节点；这些节点不访问网络、不读取凭据。默认流程手动运行。
+PBR 是基于颜色图的估算结果。BaseColor 使用 sRGB，其余贴图按非颜色数据导入引擎；ORM = R(AO), G(Roughness), B(Metallic)。
+
+验证：`python -m unittest discover -s tests -v`。
